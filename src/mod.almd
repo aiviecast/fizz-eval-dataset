@@ -28,7 +28,7 @@ fn col_comment() -> Int = 0
 fn col_reply() -> Int = 1
 
 // 行のフィールド数(タブ数 + 1)。
-fn field_count(line: String) -> Int = string.count(line, "\t") + 1
+fn field_count(line: String) -> Int = string.count_matches(line, "\t") + 1
 
 // 行が正しい列数か(6 フィールド)。
 fn has_valid_columns(line: String) -> Bool = field_count(line) == column_count()

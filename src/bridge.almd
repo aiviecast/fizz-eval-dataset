@@ -3,97 +3,97 @@
 //   列名・フィールドの文字列出力は out_ptr で読む(呼ぶたびに 1 回読む運用)。
 import self as ds
 import bytes
+import ffi
 import float
 import int
 import list
-import string
 
-var g_in: Bytes = bytes.new(0)
-var g_out: Bytes = bytes.new(0)
+var g_in: Region = ffi.region(bytes.new())
+var g_out: Bytes = bytes.zeros(0)
 
-@export(wasm, "in_alloc")
-fn in_alloc(len: Float) -> RawPtr = {
-  g_in = bytes.new(float.to_int(len))
-  bytes.as_mut_ptr(g_in)
+@export(wasm, "in_alloc", returns: address)
+effect fn in_alloc(len: Float) -> Region = {
+  g_in = ffi.alloc(int.from_saturating(len))!
+  g_in
 }
 
-@export(wasm, "out_ptr")
-fn out_ptr() -> RawPtr = bytes.as_mut_ptr(g_out)
+@export(wasm, "out_ptr", returns: address)
+fn out_ptr() -> Region = ffi.region(g_out)
 
 @export(wasm, "column_count")
-fn w_column_count() -> Float = int.to_float(ds.column_count())
+fn w_column_count() -> Float = float.from(ds.column_count())
 
 @export(wasm, "col_comment")
-fn w_col_comment() -> Float = int.to_float(ds.col_comment())
+fn w_col_comment() -> Float = float.from(ds.col_comment())
 
 @export(wasm, "col_reply")
-fn w_col_reply() -> Float = int.to_float(ds.col_reply())
+fn w_col_reply() -> Float = float.from(ds.col_reply())
 
 // 列 index → 列名を g_out に書き長さを返す。
 @export(wasm, "column_name_resolve")
 fn w_column_name(idx: Float) -> Float = {
-  let s = ds.column_name(float.to_int(idx))
+  let s = ds.column_name(int.from_saturating(idx))
   g_out = bytes.from_string(s)
-  int.to_float(list.len(string.to_bytes(s)))
+  float.from(list.len(bytes.to_list(bytes.from_string(s))))
 }
 
 // g_in に書かれた行を独立バッファへコピーしてから文字列化(almide#690 回避)。
-fn line() -> String = bytes.to_string_lossy(bytes.from_list(bytes.to_list(g_in)))
+effect fn line() -> String = bytes.to_string_lossy(ffi.to_bytes(g_in)!)
 
 @export(wasm, "field_count")
-fn w_field_count() -> Float = int.to_float(ds.field_count(line()))
+effect fn w_field_count() -> Float = float.from(ds.field_count(line()!))
 
 @export(wasm, "has_valid_columns")
-fn w_has_valid_columns() -> Float = if ds.has_valid_columns(line()) then 1.0 else 0.0
+effect fn w_has_valid_columns() -> Float = if ds.has_valid_columns(line()!) then 1.0 else 0.0
 
 @export(wasm, "is_header")
-fn w_is_header() -> Float = if ds.is_header(line()) then 1.0 else 0.0
+effect fn w_is_header() -> Float = if ds.is_header(line()!) then 1.0 else 0.0
 
 @export(wasm, "is_blank")
-fn w_is_blank() -> Float = if ds.is_blank(line()) then 1.0 else 0.0
+effect fn w_is_blank() -> Float = if ds.is_blank(line()!) then 1.0 else 0.0
 
 @export(wasm, "has_comment")
-fn w_has_comment() -> Float = if ds.has_comment(line()) then 1.0 else 0.0
+effect fn w_has_comment() -> Float = if ds.has_comment(line()!) then 1.0 else 0.0
 
 @export(wasm, "has_reply")
-fn w_has_reply() -> Float = if ds.has_reply(line()) then 1.0 else 0.0
+effect fn w_has_reply() -> Float = if ds.has_reply(line()!) then 1.0 else 0.0
 
 @export(wasm, "is_example_row")
-fn w_is_example_row() -> Float = if ds.is_example_row(line()) then 1.0 else 0.0
+effect fn w_is_example_row() -> Float = if ds.is_example_row(line()!) then 1.0 else 0.0
 
 @export(wasm, "is_monologue_row")
-fn w_is_monologue_row() -> Float = if ds.is_monologue_row(line()) then 1.0 else 0.0
+effect fn w_is_monologue_row() -> Float = if ds.is_monologue_row(line()!) then 1.0 else 0.0
 
 @export(wasm, "is_valid_row")
-fn w_is_valid_row() -> Float = if ds.is_valid_row(line()) then 1.0 else 0.0
+effect fn w_is_valid_row() -> Float = if ds.is_valid_row(line()!) then 1.0 else 0.0
 
 // 行種別: 1 = example, 2 = monologue, 0 = 無効。
 @export(wasm, "row_kind")
-fn w_row_kind() -> Float = int.to_float(ds.row_kind(line()))
+effect fn w_row_kind() -> Float = float.from(ds.row_kind(line()!))
 
 // コメント(Q)列を g_out に書き長さを返す。
 @export(wasm, "comment_resolve")
-fn w_comment_resolve() -> Float = {
-  let s = ds.comment_of(line())
+effect fn w_comment_resolve() -> Float = {
+  let s = ds.comment_of(line()!)
   g_out = bytes.from_string(s)
-  int.to_float(list.len(string.to_bytes(s)))
+  float.from(list.len(bytes.to_list(bytes.from_string(s))))
 }
 
 // 返答(A)列を g_out に書き長さを返す。
 @export(wasm, "reply_resolve")
-fn w_reply_resolve() -> Float = {
-  let s = ds.reply_of(line())
+effect fn w_reply_resolve() -> Float = {
+  let s = ds.reply_of(line()!)
   g_out = bytes.from_string(s)
-  int.to_float(list.len(string.to_bytes(s)))
+  float.from(list.len(bytes.to_list(bytes.from_string(s))))
 }
 
 effect fn main() -> Unit = {
-  let _a = in_alloc(1.0)
+  let _a = in_alloc(1.0)!
   let _b = w_column_count()
   let _c = w_column_name(0.0)
-  let _d = w_field_count()
-  let _e = w_row_kind()
-  let _f = w_reply_resolve()
+  let _d = w_field_count()!
+  let _e = w_row_kind()!
+  let _f = w_reply_resolve()!
   let _g = out_ptr()
   ()
 }
